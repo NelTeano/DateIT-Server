@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 export function initDatabase() {
-    mongoose.connect(process.env.DATABASE_URI)
+    mongoose.connect(process.env.DATABASE_URL)
     const db = mongoose.connection;
     db.on('error', (error) => console.error(error))
     db.once('open', () => console.log('CONNECTED TO THE DATABASE'))
