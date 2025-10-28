@@ -1,7 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { uploadErrorHandler } from '../middlewares/errorHandler.middleware.js';
-import { initDatabase } from '../services/Database.js';
+import { initDatabase } from '../services/database.js';
 import cors from 'cors';
 import http from "http";
 import { Server } from "socket.io";
