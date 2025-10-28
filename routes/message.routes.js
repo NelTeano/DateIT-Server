@@ -9,9 +9,9 @@ import {
 
 const router = express.Router();
 
-router.post('/send', authMiddleware, sendMessage);
-router.get('/:matchId', authMiddleware, getMessagesByMatch);
-router.patch('/:matchId/read', authMiddleware, markMessagesAsRead);
-router.get('/:matchId/unread-count', authMiddleware, getUnreadMessageCount);
+router.post('/send', verifyToken, sendMessage);
+router.get('/:matchId', verifyToken, getMessagesByMatch);
+router.patch('/:matchId/read', verifyToken, markMessagesAsRead);
+router.get('/:matchId/unread-count', verifyToken, getUnreadMessageCount);
 
 export default router;

@@ -2,6 +2,7 @@ import express from "express";
 import { preRegister, verifyEmail, loginUser, getProfile } from "../controllers/auth.controller.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
 
+
 const router = express.Router();
 
 // Step 1: Request verification email

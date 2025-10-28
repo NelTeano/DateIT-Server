@@ -7,6 +7,7 @@ import {
 } from '../controllers/match.controller.js';
 import { verifyToken } from '../middlewares/auth.middleware.js';
 
+
 const router = express.Router();
 
 router.post('/create', verifyToken, createMatch);

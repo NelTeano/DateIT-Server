@@ -23,6 +23,11 @@ const activeUsers = new Map();
 app.use(cors({
     origin: [
         'http://localhost:3001',
+        'https://dateit.vercel.app/',
+        'https://dateit.vercel.app/match',
+        'https://dateit.vercel.app/auth',
+        'http://localhost:3000/auth',
+        'http://localhost:3000'
         // 'https://reward-funding-website.vercel.app/',
         // 'https://reward-funding-website.vercel.app/Home',
     ],  

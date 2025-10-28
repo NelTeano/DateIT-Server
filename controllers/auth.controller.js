@@ -8,6 +8,7 @@ console.log("✅ bcrypt imported:", typeof bcrypt.hash, "from", import.meta.url)
 const generateToken = (payload, expiresIn = "7d") =>
   jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
 
+console.log(generateToken)
 // STEP 1: Pre-register (send verification email)
 export const preRegister = async (req, res) => {
   try {
@@ -22,7 +23,7 @@ export const preRegister = async (req, res) => {
       "15m"
     );
 
-    const verifyLink = `http://localhost:5000/api/auth/verify/${token}`;
+    const verifyLink = `http://localhost:3100/api/auth/verify/${token}`;
 
     await sendEmail(
       email,
@@ -90,7 +91,7 @@ export const verifyEmail = async (req, res) => {
     const newUser = await User.create({
       name,
       email,
-      password, // plain password — will be hashed automatically by Mongoose
+      password,
       age,
       bio,
       photoUrl,
