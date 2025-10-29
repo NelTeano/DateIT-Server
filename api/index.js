@@ -10,6 +10,8 @@ import { Server } from "socket.io";
 import AuthRoute from "../routes/auth.routes.js";
 import MatchRoute from '../routes/match.routes.js';
 import UploadRoute from '../routes/cloudinary.routes.js';
+import MessageRoute from '../routes/message.routes.js';
+import UserRoute from '../routes/user.routes.js';
 
 dotenv.config();
 initDatabase();
@@ -104,8 +106,8 @@ io.on('connection', (socket) => {
 app.use('/api', UploadRoute);
 app.use("/api/auth", AuthRoute);
 app.use('/api/matches', MatchRoute);
-
-
+app.use('/api/chat', MessageRoute);
+app.use('/api/users', UserRoute);
 
 // Error handling middleware (must be after routes)
 app.use(uploadErrorHandler);

@@ -1,5 +1,5 @@
-import Message from '../models/Message.js';
-import Match from '../models/Match.js';
+import Message from '../models/message.model.js';
+import Match from '../models/match.model.js';
 
 /**
  * Send a message
@@ -52,8 +52,8 @@ export const sendMessage = async (req, res) => {
     await newMessage.populate('sender', 'name profilePicture');
 
     // Emit socket event to the match room
-    const io = req.app.get('io');
-    io.to(matchId).emit('message:received', newMessage);
+    // const io = req.app.get('io');
+    // io.to(matchId).emit('message:received', newMessage);
 
     res.status(201).json({
       success: true,
@@ -134,18 +134,18 @@ export const markMessagesAsRead = async (req, res) => {
 
     // Update all unread messages where user is the receiver
     const result = await Message.updateMany(
-      {
-        matchId,
-        receiver: userId,
-        isRead: false,
+    {
+      matchId,
+      receiver: userId,
+      read: false,
+    },
+    {
+      $set: {
+        read: true,
+        readAt: new Date(),
       },
-      {
-        $set: {
-          isRead: true,
-          readAt: new Date(),
-        },
-      }
-    );
+    }
+  );
 
     res.json({
       success: true,
@@ -172,7 +172,7 @@ export const getUnreadMessageCount = async (req, res) => {
     const unreadCount = await Message.countDocuments({
       matchId,
       receiver: userId,
-      isRead: false,
+      read: false,
     });
 
     res.json({

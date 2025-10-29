@@ -9,9 +9,19 @@ export const uploadSingleImage = async (req, res) => {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
+    // Extract the Cloudinary URL from the uploaded file
+    const imageUrl = req.file.path; // Cloudinary stores the URL in file.path
+    const publicId = req.file.filename; // Cloudinary stores the public ID in file.filename
+
     return res.json({
       message: 'Upload successful',
-      file: req.file,
+      data: {
+        secureUrl: imageUrl,  // ✅ This matches what your frontend expects
+        publicId: publicId,
+        format: req.file.format,
+        width: req.file.width,
+        height: req.file.height
+      }
     });
 
   } catch (error) {
