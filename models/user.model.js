@@ -8,7 +8,18 @@ const userSchema = new mongoose.Schema({
   bio: { type: String },
   age: { type: Number },
   photoUrl: { type: String },
+  gender: { 
+    type: String, 
+    required: true,
+    enum: ["male", "female", "non-binary", "other"]
+  },
+  findGender: { 
+    type: String, 
+    required: true,
+    enum: ["male", "female", "non-binary", "other", "everyone"]
+  },
   likedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  passedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   matches: [{ type: mongoose.Schema.Types.ObjectId, ref: "Match" }],
 }, { timestamps: true });
 
