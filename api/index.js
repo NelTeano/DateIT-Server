@@ -23,18 +23,13 @@ const activeUsers = new Map();
 
 // CORS 
 app.use(cors({
-    origin: [
-        'http://localhost:3001',
-        'https://dateit.vercel.app/',
-        'https://dateit.vercel.app/match',
-        'https://dateit.vercel.app/auth',
-        'http://localhost:3000/auth',
-        'http://localhost:3000'
-        // 'https://reward-funding-website.vercel.app/',
-        // 'https://reward-funding-website.vercel.app/Home',
-    ],  
-    // THE HTTP(ORIGIN) THAT WILL ALLOW TO ACCESS THE ROUTES
-    credentials: true,
+  origin: [
+    'http://localhost:3001',
+    'http://localhost:3000',
+    'https://dateit.vercel.app',
+  ],  
+  // THE HTTP(ORIGIN) THAT WILL ALLOW TO ACCESS THE ROUTES
+  credentials: true,
 }));
 
 // Middleware
