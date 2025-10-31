@@ -1,7 +1,6 @@
 import express from "express";
-import { preRegister, verifyEmail, loginUser, getProfile } from "../controllers/auth.controller.js";
-import { verifyToken } from "../middlewares/auth.middleware.js";
-
+import { preRegister, verifyEmail, loginUser, getProfile, updateProfile, getSuggestions, passUser } from "../controllers/auth.controller.js";
+import { verifyToken } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
@@ -13,6 +12,11 @@ router.get("/verify/:token", verifyEmail);
 
 // Existing routes
 router.post("/login", loginUser);
+
+// Protected routes (require authentication)
 router.get("/profile", verifyToken, getProfile);
+router.put("/profile", verifyToken, updateProfile);
+router.get("/suggestions", verifyToken, getSuggestions);
+router.post("/pass", verifyToken, passUser);
 
 export default router;

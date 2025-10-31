@@ -8,18 +8,26 @@ console.log("✅ bcrypt imported:", typeof bcrypt.hash, "from", import.meta.url)
 const generateToken = (payload, expiresIn = "7d") =>
   jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
 
-console.log(generateToken)
+console.log(generateToken);
+
 // STEP 1: Pre-register (send verification email)
 export const preRegister = async (req, res) => {
   try {
-    const { name, email, password, age, bio, photoUrl } = req.body;
+    const { name, email, password, age, bio, photoUrl, gender, findGender } = req.body;
+
+    // Validate required fields
+    if (!gender || !findGender) {
+      return res.status(400).json({ 
+        message: "Gender and gender preference (findGender) are required." 
+      });
+    }
 
     const existingUser = await User.findOne({ email });
     if (existingUser)
       return res.status(400).json({ message: "Email is already registered." });
 
     const token = generateToken(
-      { name, email, password, age, bio, photoUrl },
+      { name, email, password, age, bio, photoUrl, gender, findGender },
       "15m"
     );
 
@@ -39,7 +47,7 @@ export const preRegister = async (req, res) => {
             target="_blank">
             Verify My Account
           </a>
-          <p>If the button doesn’t work, copy and paste this link:</p>
+          <p>If the button doesn't work, copy and paste this link:</p>
           <p><a href="${verifyLink}" target="_blank">${verifyLink}</a></p>
           <p>This link expires in 15 minutes.</p>
         </div>
@@ -64,7 +72,6 @@ export const verifyEmail = async (req, res) => {
   try {
     console.log("📂 Running verifyEmail from:", import.meta.url);
 
-    // Dynamically import bcrypt to ensure it's defined in this scope
     const { default: bcryptjs } = await import("bcryptjs");
     console.log("🔐 bcryptjs dynamically imported:", typeof bcryptjs.hash);
 
@@ -73,10 +80,14 @@ export const verifyEmail = async (req, res) => {
 
     console.log("🪪 Decoded Token Data:", decoded);
 
-    const { name, email, password, age, bio, photoUrl } = decoded;
+    const { name, email, password, age, bio, photoUrl, gender, findGender } = decoded;
 
     if (!password) {
       return res.status(400).json({ message: "Invalid or missing password in token." });
+    }
+
+    if (!gender || !findGender) {
+      return res.status(400).json({ message: "Invalid or missing gender preferences in token." });
     }
 
     const existingUser = await User.findOne({ email });
@@ -84,7 +95,6 @@ export const verifyEmail = async (req, res) => {
       return res.status(400).json({ message: "Email is already verified and registered." });
     }
 
-    // ✅ Use bcryptjs for hashing here
     const hashedPassword = await bcryptjs.hash(password, 10);
     console.log("🔑 Password successfully hashed:", hashedPassword.substring(0, 10) + "...");
 
@@ -95,6 +105,8 @@ export const verifyEmail = async (req, res) => {
       age,
       bio,
       photoUrl,
+      gender,
+      findGender,
     });
 
     console.log("✅ User Created:", newUser.email);
@@ -130,6 +142,8 @@ export const loginUser = async (req, res) => {
       bio: user.bio,
       age: user.age,
       photoUrl: user.photoUrl,
+      gender: user.gender,
+      findGender: user.findGender,
       token,
     });
   } catch (error) {
@@ -146,5 +160,114 @@ export const getProfile = async (req, res) => {
     res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch profile", error: error.message });
+  }
+};
+
+// STEP 5: Update Profile
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, bio, age, photoUrl, gender, findGender } = req.body;
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Update fields if provided
+    if (name) user.name = name;
+    if (bio !== undefined) user.bio = bio;
+    if (age) user.age = age;
+    if (photoUrl) user.photoUrl = photoUrl;
+    if (gender) user.gender = gender;
+    if (findGender) user.findGender = findGender;
+
+    await user.save();
+
+    res.status(200).json({
+      message: "Profile updated successfully",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        bio: user.bio,
+        age: user.age,
+        photoUrl: user.photoUrl,
+        gender: user.gender,
+        findGender: user.findGender,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update profile", error: error.message });
+  }
+};
+
+// STEP 6: Get Matching Suggestions
+export const getSuggestions = async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) return res.status(404).json({ message: "User not found" });
+
+    // Build filter criteria
+    const filter = {
+      _id: { 
+        $nin: [
+          currentUser._id,
+          ...currentUser.likedUsers,
+          ...currentUser.passedUsers,
+          ...currentUser.matches
+        ]
+      }
+    };
+
+    // Filter by gender preference
+    if (currentUser.findGender !== "everyone") {
+      filter.gender = currentUser.findGender;
+    }
+
+    // Find matching users
+    const suggestions = await User.find(filter)
+      .select("-password -likedUsers -passedUsers -matches")
+      .limit(20);
+
+    res.status(200).json({
+      suggestions,
+      total: suggestions.length
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: "Failed to fetch suggestions", 
+      error: error.message 
+    });
+  }
+};
+
+// STEP 7: Pass a user (swipe left)
+export const passUser = async (req, res) => {
+  try {
+    const { passedUserId } = req.body;
+
+    if (!passedUserId) {
+      return res.status(400).json({ message: "passedUserId is required" });
+    }
+
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) return res.status(404).json({ message: "User not found" });
+
+    // Check if user already passed
+    if (currentUser.passedUsers.includes(passedUserId)) {
+      return res.status(400).json({ message: "User already passed" });
+    }
+
+    // Add to passedUsers
+    currentUser.passedUsers.push(passedUserId);
+    await currentUser.save();
+
+    res.status(200).json({ 
+      message: "User passed successfully",
+      passedUserId 
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: "Failed to pass user", 
+      error: error.message 
+    });
   }
 };
