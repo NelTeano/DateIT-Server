@@ -27,6 +27,8 @@ app.use(cors({
     'http://localhost:3001',
     'http://localhost:3000',
     'https://dateit.vercel.app',
+    'https://dateit.vercel.app/*',
+
   ],  
   // THE HTTP(ORIGIN) THAT WILL ALLOW TO ACCESS THE ROUTES
   credentials: true,
