@@ -1,80 +1,99 @@
 import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 
-// 🟢 Create User
-export const createUser = async (req, res) => {
+export const getMyProfile = async (req, res) => {
   try {
-    const { name, email, password, bio, age, photoUrl } = req.body;
+    const userId = req.user.id; // From auth middleware
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ success: false, message: "Email already exists" });
+    const user = await User.findById(userId).select('-password');
 
-    const newUser = await User.create({ name, email, password, bio, age, photoUrl });
-    res.status(201).json({ success: true, user: newUser });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// 🟡 Get All Users
-export const getUsers = async (req, res) => {
-  try {
-    const users = await User.find().populate("likedUsers", "name email").populate("matches", "user1 user2");
-    res.json({ success: true, users });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// 🟣 Get Single User by ID
-export const getUserById = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id)
-      .populate("likedUsers", "name email")
-      .populate("matches", "user1 user2");
-
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
-    res.json({ success: true, user });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// 🟠 Update User
-export const updateUser = async (req, res) => {
-  try {
-    const { name, email, password, bio, age, photoUrl } = req.body;
-
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-    // Update fields
-    user.name = name ?? user.name;
-    user.email = email ?? user.email;
-    user.bio = bio ?? user.bio;
-    user.age = age ?? user.age;
-    user.photoUrl = photoUrl ?? user.photoUrl;
-
-    // Rehash password if changed
-    if (password) {
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(password, salt);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
     }
 
-    await user.save();
-    res.json({ success: true, message: "User updated successfully", user });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(200).json({
+      success: true,
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      age: user.age,
+      bio: user.bio,
+      photoUrl: user.photoUrl,
+      gender: user.gender,
+      findGender: user.findGender,
+      createdAt: user.createdAt
+    });
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ 
+      success: false,
+      message: "Failed to fetch profile", 
+      error: error.message 
+    });
   }
 };
 
-// 🔴 Delete User
-export const deleteUser = async (req, res) => {
+/**
+ * Update current user's profile
+ */
+export const updateMyProfile = async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
-    res.json({ success: true, message: "User deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    const userId = req.user.id;
+    const { name, age, bio, photoUrl, gender, findGender } = req.body;
+
+    // Validate required fields
+    if (!name || !gender || !findGender) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, gender, and gender preference are required"
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    // Update fields
+    user.name = name;
+    user.gender = gender;
+    user.findGender = findGender;
+    
+    // Optional fields
+    if (age !== undefined) user.age = age;
+    if (bio !== undefined) user.bio = bio;
+    if (photoUrl !== undefined) user.photoUrl = photoUrl;
+
+    await user.save();
+
+    // Return updated user without password
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        age: user.age,
+        bio: user.bio,
+        photoUrl: user.photoUrl,
+        gender: user.gender,
+        findGender: user.findGender
+      }
+    });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ 
+      success: false,
+      message: "Failed to update profile", 
+      error: error.message 
+    });
   }
 };

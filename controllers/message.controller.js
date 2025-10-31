@@ -78,7 +78,9 @@ export const getMessagesByMatch = async (req, res) => {
     const { page = 1, limit = 50 } = req.query;
 
     // Verify match exists and user is part of it
-    const match = await Match.findById(matchId);
+    const match = await Match.findById(matchId)
+      .populate('user1', 'name profilePicture')
+      .populate('user2', 'name profilePicture');
 
     if (!match) {
       return res.status(404).json({
@@ -88,8 +90,8 @@ export const getMessagesByMatch = async (req, res) => {
     }
 
     const isPartOfMatch =
-      match.user1.toString() === userId ||
-      match.user2.toString() === userId;
+      match.user1._id.toString() === userId ||
+      match.user2._id.toString() === userId;
 
     if (!isPartOfMatch) {
       return res.status(403).json({
@@ -111,6 +113,7 @@ export const getMessagesByMatch = async (req, res) => {
     res.json({
       success: true,
       messages: messages.reverse(),
+      match, // ✅ Include match details
       totalPages: Math.ceil(totalMessages / limit),
       currentPage: page,
       totalMessages,
@@ -132,20 +135,32 @@ export const markMessagesAsRead = async (req, res) => {
     const { matchId } = req.params;
     const userId = req.user.id;
 
-    // Update all unread messages where user is the receiver
-    const result = await Message.updateMany(
-    {
+    console.log('Marking messages as read:', {
       matchId,
-      receiver: userId,
-      read: false,
-    },
-    {
-      $set: {
-        read: true,
-        readAt: new Date(),
+      userId,
+      user: req.user
+    });
+
+    // Update all unread messages where user is the receiver
+    // IMPORTANT: Only marks messages as read where the current user is the RECEIVER
+    const result = await Message.updateMany(
+      {
+        matchId,
+        receiver: userId, // Only messages where I am the receiver
+        read: false,      // Only unread messages
       },
-    }
-  );
+      {
+        $set: {
+          read: true,
+          readAt: new Date(),
+        },
+      }
+    );
+
+    console.log('Messages marked as read result:', {
+      modifiedCount: result.modifiedCount,
+      matchedCount: result.matchedCount
+    });
 
     res.json({
       success: true,

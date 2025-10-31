@@ -13,7 +13,7 @@ const matchSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'ended'],
+    enum: ['pending', 'active', 'ended'],
     default: 'active'
   },
   endedBy: {

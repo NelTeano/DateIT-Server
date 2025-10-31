@@ -41,66 +41,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Socket.io connection
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-
-  // User joins with their userId
-  socket.on('user:join', (userId) => {
-    activeUsers.set(userId, socket.id);
-    console.log(`User ${userId} joined with socket ${socket.id}`);
-  });
-
-  // Join a specific match room
-  socket.on('match:join', (matchId) => {
-    socket.join(matchId);
-    console.log(`Socket ${socket.id} joined match room ${matchId}`);
-  });
-
-  // Leave a match room
-  socket.on('match:leave', (matchId) => {
-    socket.leave(matchId);
-    console.log(`Socket ${socket.id} left match room ${matchId}`);
-  });
-
-  // Handle new message
-  socket.on('message:send', (data) => {
-    const { matchId, message } = data;
-    // Emit to all users in the match room
-    io.to(matchId).emit('message:received', message);
-  });
-
-  // Handle match ended
-  socket.on('match:ended', (data) => {
-    const { matchId, endedBy } = data;
-    // Notify all users in the match room
-    io.to(matchId).emit('match:status', { matchId, status: 'ended', endedBy });
-  });
-
-  // Handle typing indicator
-  socket.on('typing:start', (data) => {
-    const { matchId, userId } = data;
-    socket.to(matchId).emit('typing:user', { userId, isTyping: true });
-  });
-
-  socket.on('typing:stop', (data) => {
-    const { matchId, userId } = data;
-    socket.to(matchId).emit('typing:user', { userId, isTyping: false });
-  });
-
-  // Disconnect
-  socket.on('disconnect', () => {
-    // Remove user from activeUsers
-    for (const [userId, socketId] of activeUsers.entries()) {
-      if (socketId === socket.id) {
-        activeUsers.delete(userId);
-        break;
-      }
-    }
-    console.log('User disconnected:', socket.id);
-  });
-});
-
 
 // Routes
 app.use('/api', UploadRoute);
@@ -114,6 +54,9 @@ app.use(uploadErrorHandler);
 
 
 const PORT = process.env.PORT || 3100;
+app.get('check', (req, res) => {
+  res.send('API is running...');
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

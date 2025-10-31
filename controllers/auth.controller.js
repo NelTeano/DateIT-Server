@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import User from "../models/user.model.js";
+import Match from "../models/match.model.js";
 import { sendEmail } from "../services/sendEmail.js";
 
 console.log("✅ bcrypt imported:", typeof bcrypt.hash, "from", import.meta.url);
@@ -199,75 +200,223 @@ export const updateProfile = async (req, res) => {
   }
 };
 
-// STEP 6: Get Matching Suggestions
+// //**
+//  * Get user suggestions (exclude liked, passed, and pending match users)
+//  //*/
 export const getSuggestions = async (req, res) => {
   try {
-    const currentUser = await User.findById(req.user.id);
-    if (!currentUser) return res.status(404).json({ message: "User not found" });
+    const userId = req.user.id;
 
-    // Build filter criteria
-    const filter = {
-      _id: { 
-        $nin: [
-          currentUser._id,
-          ...currentUser.likedUsers,
-          ...currentUser.passedUsers,
-          ...currentUser.matches
-        ]
-      }
-    };
+    // Get current user to check their preferences
+    const currentUser = await User.findById(userId);
 
-    // Filter by gender preference
-    if (currentUser.findGender !== "everyone") {
-      filter.gender = currentUser.findGender;
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
     }
 
-    // Find matching users
-    const suggestions = await User.find(filter)
-      .select("-password -likedUsers -passedUsers -matches")
+    // Find all pending matches where current user is involved
+    const pendingMatches = await Match.find({
+      $or: [
+        { user1: userId, status: 'pending' },
+        { user2: userId, status: 'pending' }
+      ]
+    });
+
+    // Extract user IDs from pending matches
+    const pendingUserIds = pendingMatches.map(match => {
+      return match.user1.toString() === userId 
+        ? match.user2.toString() 
+        : match.user1.toString();
+    });
+
+    // Find all active or ended matches where current user is involved
+    const existingMatches = await Match.find({
+      $or: [
+        { user1: userId, status: { $in: ['active', 'ended'] } },
+        { user2: userId, status: { $in: ['active', 'ended'] } }
+      ]
+    });
+
+    // Extract user IDs from existing matches
+    const matchedUserIds = existingMatches.map(match => {
+      return match.user1.toString() === userId 
+        ? match.user2.toString() 
+        : match.user1.toString();
+    });
+
+    // Build exclusion list: self + liked + passed + pending + matched users
+    const excludedUserIds = [
+      userId,
+      ...currentUser.likedUsers.map(id => id.toString()),
+      ...currentUser.passedUsers.map(id => id.toString()),
+      ...pendingUserIds,
+      ...matchedUserIds
+    ];
+
+    // Remove duplicates
+    const uniqueExcludedIds = [...new Set(excludedUserIds)];
+
+    // Build query based on gender preference
+    let genderQuery = {};
+    if (currentUser.findGender !== 'everyone') {
+      genderQuery.gender = currentUser.findGender;
+    }
+
+    // Get suggestions
+    const suggestions = await User.find({
+      _id: { $nin: uniqueExcludedIds },
+      ...genderQuery
+    })
+      .select('name age bio photoUrl gender')
       .limit(20);
 
     res.status(200).json({
+      success: true,
       suggestions,
-      total: suggestions.length
+      count: suggestions.length
     });
   } catch (error) {
-    res.status(500).json({ 
-      message: "Failed to fetch suggestions", 
-      error: error.message 
+    console.error('Error fetching suggestions:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch suggestions",
+      error: error.message
     });
   }
 };
 
-// STEP 7: Pass a user (swipe left)
+/**
+ * Pass a user
+ */
 export const passUser = async (req, res) => {
   try {
+    const userId = req.user.id;
     const { passedUserId } = req.body;
 
     if (!passedUserId) {
-      return res.status(400).json({ message: "passedUserId is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Passed user ID is required"
+      });
     }
 
-    const currentUser = await User.findById(req.user.id);
-    if (!currentUser) return res.status(404).json({ message: "User not found" });
+    // Add to passed users if not already there
+    await User.findByIdAndUpdate(
+      userId,
+      { $addToSet: { passedUsers: passedUserId } }
+    );
 
-    // Check if user already passed
-    if (currentUser.passedUsers.includes(passedUserId)) {
-      return res.status(400).json({ message: "User already passed" });
-    }
-
-    // Add to passedUsers
-    currentUser.passedUsers.push(passedUserId);
-    await currentUser.save();
-
-    res.status(200).json({ 
-      message: "User passed successfully",
-      passedUserId 
+    res.status(200).json({
+      success: true,
+      message: "User passed successfully"
     });
   } catch (error) {
-    res.status(500).json({ 
-      message: "Failed to pass user", 
-      error: error.message 
+    console.error('Error passing user:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to pass user",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Like a user and create match
+ */
+export const likeUser = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { likedUserId } = req.body;
+
+    if (!likedUserId) {
+      return res.status(400).json({
+        success: false,
+        message: "Liked user ID is required"
+      });
+    }
+
+    // Add to liked users if not already there
+    await User.findByIdAndUpdate(
+      userId,
+      { $addToSet: { likedUsers: likedUserId } }
+    );
+
+    // Check if the other user has already liked this user
+    const otherUser = await User.findById(likedUserId);
+
+    if (!otherUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const otherUserLikedBack = otherUser.likedUsers.some(
+      id => id.toString() === userId
+    );
+
+    let isMatch = false;
+    let match = null;
+
+    if (otherUserLikedBack) {
+      // It's a match! Create active match
+      // Check if match already exists
+      const existingMatch = await Match.findOne({
+        $or: [
+          { user1: userId, user2: likedUserId },
+          { user1: likedUserId, user2: userId }
+        ]
+      });
+
+      if (!existingMatch) {
+        match = new Match({
+          user1: userId,
+          user2: likedUserId,
+          status: 'active'
+        });
+        await match.save();
+      } else {
+        // Update existing match to active
+        existingMatch.status = 'active';
+        await existingMatch.save();
+        match = existingMatch;
+      }
+
+      isMatch = true;
+    } else {
+      // Create pending match (one-sided like)
+      const existingMatch = await Match.findOne({
+        $or: [
+          { user1: userId, user2: likedUserId },
+          { user1: likedUserId, user2: userId }
+        ]
+      });
+
+      if (!existingMatch) {
+        match = new Match({
+          user1: userId,
+          user2: likedUserId,
+          status: 'pending'
+        });
+        await match.save();
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: isMatch ? "It's a match!" : "Like sent successfully",
+      isMatch,
+      matchId: match?._id
+    });
+  } catch (error) {
+    console.error('Error liking user:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to like user",
+      error: error.message
     });
   }
 };
