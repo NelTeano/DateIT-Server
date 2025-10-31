@@ -32,7 +32,7 @@ export const preRegister = async (req, res) => {
       "15m"
     );
 
-    const verifyLink = `http://localhost:3100/api/auth/verify/${token}`;
+    const verifyLink = `https://dateitserver.vercel.app/api/auth/verify/${token}`;
 
     await sendEmail(
       email,
@@ -111,7 +111,7 @@ export const verifyEmail = async (req, res) => {
     });
 
     console.log("✅ User Created:", newUser.email);
-    res.status(201).json({ message: "Email verified. Account created successfully!" });
+    return res.redirect('https://dateit.vercel.app/auth');
 
   } catch (error) {
     if (error.name === "TokenExpiredError") {
